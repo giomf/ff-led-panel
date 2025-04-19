@@ -1,7 +1,9 @@
-use crate::am03127::delete::DeletePage;
+use crate::am03127::delete::{DeletePage, DeleteSchedule};
 use crate::am03127::page_content::formatting::{Clock as ClockFormat, ColumnStart, Font};
 use crate::am03127::page_content::{Lagging, Leading, WaitingModeAndSpeed};
 use crate::am03127::realtime_clock::RealTimeClock;
+use crate::am03127::schedule::Schedule as SchedulePlan;
+use crate::am03127::{CommandAble, DEFAULT_ID};
 use crate::{WEB_TASK_POOL_SIZE, am03127::page_content::PageContent, uart::Uart};
 use core::convert::From;
 use core::fmt::Write;
@@ -39,6 +41,7 @@ impl From<DateTime> for RealTimeClock {
             .hour(clock.hour)
             .minute(clock.minute)
             .second(clock.second)
+            .week(clock.week)
     }
 }
 
@@ -51,6 +54,7 @@ impl From<Page> for PageContent {
             .message(&page.text)
     }
 }
+
 #[derive(Deserialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Page {
@@ -115,7 +119,9 @@ impl AppWithStateBuilder for AppProps {
                         )
                         .unwrap();
 
-                        let command = PageContent::default().message(&message.as_str()).command();
+                        let command = PageContent::default()
+                            .message(&message.as_str())
+                            .command(DEFAULT_ID);
                         shared_uart
                             .lock()
                             .await
@@ -129,7 +135,7 @@ impl AppWithStateBuilder for AppProps {
                      Json::<DateTime, JSON_DESERIALIZE_BUFFER_SIZE>(clock)| async move {
                         log::info!("Set clock");
 
-                        let command = RealTimeClock::from(clock).command();
+                        let command = RealTimeClock::from(clock).command(DEFAULT_ID);
 
                         shared_uart
                             .lock()
@@ -148,7 +154,7 @@ impl AppWithStateBuilder for AppProps {
                      Json::<Page, JSON_DESERIALIZE_BUFFER_SIZE>(page)| async move {
                         log::info!("Setting page {page_id}");
 
-                        let command = PageContent::from(page).page(page_id).command();
+                        let command = PageContent::from(page).page(page_id).command(DEFAULT_ID);
 
                         shared_uart
                             .lock()
@@ -160,9 +166,7 @@ impl AppWithStateBuilder for AppProps {
                 )
                 .delete(
                     |page_id, State(SharedUart(shared_uart)): State<SharedUart>| async move {
-                        log::info!("Deleting page {page_id}");
-
-                        let command = DeletePage::default().page(page_id).command();
+                        let command = DeletePage::default().page_id(page_id).command(DEFAULT_ID);
 
                         shared_uart
                             .lock()
@@ -180,7 +184,7 @@ impl AppWithStateBuilder for AppProps {
                      State(SharedUart(shared_uart)): State<SharedUart>,
                      Json::<Schedule, JSON_DESERIALIZE_BUFFER_SIZE>(schedule)| async move {
                         log::info!("Setting schedule {schedule_id}");
-                        let command = DeletePage::default().command();
+                        let command = DeletePage::default().command(DEFAULT_ID);
 
                         shared_uart
                             .lock()
@@ -193,7 +197,9 @@ impl AppWithStateBuilder for AppProps {
                 .delete(
                     |schedule_id, State(SharedUart(shared_uart)): State<SharedUart>| async move {
                         log::info!("Deleting schedule {schedule_id}");
-                        let command = DeletePage::default().command();
+                        let command = DeleteSchedule::default()
+                            .schedule_id(schedule_id)
+                            .command(DEFAULT_ID);
 
                         shared_uart
                             .lock()

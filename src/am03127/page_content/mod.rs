@@ -2,10 +2,10 @@
 
 pub mod formatting;
 
-use core::fmt::{self, Display, Write};
+use core::fmt::{self, Display};
 use heapless::String;
 
-use super::{DEFAULT_ID, DEFAULT_LINE, DEFAULT_PAGE, STRING_SIZE, wrap_command};
+use super::{CommandAble, DEFAULT_ID, DEFAULT_LINE, DEFAULT_PAGE, STRING_SIZE};
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -216,6 +216,8 @@ pub struct PageContent {
     message: String<STRING_SIZE>,
 }
 
+impl CommandAble for PageContent {}
+
 impl PageContent {
     pub fn id(mut self, id: u8) -> Self {
         self.id = id;
@@ -247,22 +249,6 @@ impl PageContent {
         self
     }
 
-    pub fn command(&self) -> String<STRING_SIZE> {
-        let mut command = String::<STRING_SIZE>::new();
-        write!(
-            &mut command,
-            "<L{}><P{}><F{}><M{}><WA><F{}>",
-            self.line, self.page, self.leading, self.waiting_mode_and_speed, self.lagging
-        )
-        .unwrap();
-
-        // Append the processed message
-        let processed = Self::replace_european_character(&self.message);
-        let _ = command.push_str(&processed);
-
-        wrap_command(self.id, &command)
-    }
-
     fn replace_european_character(message: &str) -> String<STRING_SIZE> {
         let mut result = String::<STRING_SIZE>::new();
         for c in message.chars() {
@@ -278,6 +264,17 @@ impl PageContent {
             }
         }
         result
+    }
+}
+
+impl Display for PageContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = Self::replace_european_character(&self.message);
+        write!(
+            f,
+            "<L{}><P{}><F{}><M{}><WA><F{}>{}",
+            self.line, self.page, self.leading, self.waiting_mode_and_speed, self.lagging, message
+        )
     }
 }
 
